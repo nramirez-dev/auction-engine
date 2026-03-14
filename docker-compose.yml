@@ -54,6 +54,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./migrations:/app/migrations
+      - ./tests:/app/tests
     environment:
       DB_HOST: postgres
       REDIS_HOST: redis

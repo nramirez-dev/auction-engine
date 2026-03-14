@@ -1,98 +1,90 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches:
-      - "**"
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: ${{ vars.POSTGRES_IMAGE }}
-        env:
-          POSTGRES_DB: ${{ vars.DB_NAME }}
-          POSTGRES_USER: ${{ vars.DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASS }}
-        ports:
-          - ${{ vars.DB_PORT }}:${{ vars.DB_PORT }}
-        options: >-
-          --health-cmd "pg_isready -U ${{ vars.DB_USER }} -d ${{ vars.DB_NAME }}"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: ${{ vars.REDIS_IMAGE }}
-        ports:
-          - ${{ vars.REDIS_PORT }}:${{ vars.REDIS_PORT }}
-
-    env:
-      DB_HOST: localhost
-      DB_PORT: ${{ vars.DB_PORT }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      DB_USER: ${{ vars.DB_USER }}
-      DB_PASS: ${{ secrets.DB_PASS }}
-
-      REDIS_HOST: localhost
-      REDIS_PORT: ${{ vars.REDIS_PORT }}
-
-      DATABASE_URL: postgresql+asyncpg://${{ vars.DB_USER }}:${{ secrets.DB_PASS }}@localhost:${{ vars.DB_PORT }}/${{ vars.DB_NAME }}
-
-      SECRET_KEY: ${{ secrets.SECRET_KEY }}
-
-      PYTHONPATH: .
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ vars.PYTHON_VERSION }}
-
-      - name: Install dependencies
+      - name: Create .env file
+        env:
+          DB_NAME: ${{ vars.DB_NAME }}
+          DB_USER: ${{ vars.DB_USER }}
+          DB_PASS: ${{ secrets.TEST_DB_PASS }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          REDIS_PORT: ${{ vars.REDIS_PORT }}
+          SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          {
+            printf 'POSTGRES_DB=%s\n'       "${DB_NAME}"
+            printf 'POSTGRES_USER=%s\n'     "${DB_USER}"
+            printf 'POSTGRES_PASSWORD=%s\n' "${DB_PASS}"
+            printf 'REDIS_PASS=%s\n'        "${DB_PASS}"
+            printf 'DB_HOST=postgres\n'
+            printf 'DB_PORT=%s\n'           "${DB_PORT}"
+            printf 'DB_NAME=%s\n'           "${DB_NAME}"
+            printf 'DB_USER=%s\n'           "${DB_USER}"
+            printf 'DB_PASS=%s\n'           "${DB_PASS}"
+            printf 'REDIS_HOST=redis\n'
+            printf 'REDIS_PORT=%s\n'        "${REDIS_PORT}"
+            printf 'SECRET_KEY=%s\n'        "${SECRET_KEY}"
+            printf 'DEBUG=false\n'
+            printf 'DATABASE_URL=postgresql+asyncpg://%s:%s@postgres:%s/%s\n' \
+              "${DB_USER}" "${DB_PASS}" "${DB_PORT}" "${DB_NAME}"
+          } > .env
 
-      - name: Wait for Postgres
+      - name: Start services
+        run: docker compose up -d postgres redis
+
+      - name: Wait for PostgreSQL
         run: |
-          until pg_isready -h localhost -p ${{ vars.DB_PORT }} -U ${{ vars.DB_USER }}; do
-            echo "Waiting for postgres..."
+          n=0
+          until docker compose exec -T postgres \
+            pg_isready -U ${{ vars.DB_USER }} -d ${{ vars.DB_NAME }}; do
+            n=$((n + 1))
+            if [ "$n" -ge 30 ]; then
+              echo "Timed out waiting for postgres"
+              docker compose logs postgres
+              exit 1
+            fi
+            echo "Waiting for postgres... (${n}/30)"
             sleep 2
           done
 
+      - name: Wait for Redis
+        env:
+          REDIS_PASS: ${{ secrets.TEST_DB_PASS }}
+        run: |
+          n=0
+          until docker compose exec -T redis \
+            redis-cli -a "${REDIS_PASS}" ping | grep -q PONG; do
+            n=$((n + 1))
+            if [ "$n" -ge 30 ]; then
+              echo "Timed out waiting for redis"
+              docker compose logs redis
+              exit 1
+            fi
+            echo "Waiting for redis... (${n}/30)"
+            sleep 2
+          done
+
+      - name: Build API
+        run: docker compose build api
+
       - name: Run migrations
-        run: alembic upgrade head
+        run: docker compose run --rm api alembic upgrade head
 
       - name: Run tests
-        run: |
-          if [ -d "tests" ] && [ -n "$(find tests/ -name '*.py' -not -name '__init__.py')" ]; then
-            pytest tests/ -v --tb=short
-          else
-            echo "No tests found — migration smoke test passed."
-          fi
+        run: docker compose run --rm api pytest
 
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/${{ vars.DOCKER_IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

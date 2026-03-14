@@ -23,7 +23,9 @@ COPY --from=builder /install /usr/local
 
 # Copy application files
 COPY src/ src/
+COPY tests/ tests/
 COPY alembic.ini .
+COPY pytest.ini .
 COPY migrations/ migrations/
 COPY scripts/ scripts/
 
