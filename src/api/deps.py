@@ -34,6 +34,9 @@ def get_product_repository(db: AsyncSession = Depends(get_db)) -> IProductReposi
 def get_auction_repository(db: AsyncSession = Depends(get_db)) -> IAuctionRepository:
     return AuctionRepository(db)
 
+def get_redis_client(redis: Redis = Depends(get_redis)) -> Redis:
+    return redis
+
 def get_lock_service(redis: Redis = Depends(get_redis)) -> ILockService:
     return LockService(redis)
 
