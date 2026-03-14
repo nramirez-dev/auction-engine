@@ -97,4 +97,5 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(bids.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(auctions.router, prefix="/api/v1")
+app.include_router(ws.http_router, prefix="/api/v1")
 app.include_router(ws.router)
