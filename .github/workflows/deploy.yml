@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   test:
@@ -11,35 +11,38 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: ${{ vars.POSTGRES_IMAGE }}
         env:
-          POSTGRES_DB: auction
-          POSTGRES_USER: auction_user
-          POSTGRES_PASSWORD: auction_pass_test
+          POSTGRES_DB: ${{ vars.DB_NAME }}
+          POSTGRES_USER: ${{ vars.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASS }}
         ports:
-          - 5432:5432
+          - ${{ vars.DB_PORT }}:${{ vars.DB_PORT }}
         options: >-
-          --health-cmd "pg_isready -U auction_user -d auction"
+          --health-cmd "pg_isready -U ${{ vars.DB_USER }} -d ${{ vars.DB_NAME }}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
       redis:
-        image: redis:7-alpine
+        image: ${{ vars.REDIS_IMAGE }}
         ports:
-          - 6379:6379
+          - ${{ vars.REDIS_PORT }}:${{ vars.REDIS_PORT }}
 
     env:
       DB_HOST: localhost
-      DB_PORT: 5432
-      DB_NAME: auction
-      DB_USER: auction_user
-      DB_PASS: auction_pass_test
+      DB_PORT: ${{ vars.DB_PORT }}
+      DB_NAME: ${{ vars.DB_NAME }}
+      DB_USER: ${{ vars.DB_USER }}
+      DB_PASS: ${{ secrets.DB_PASS }}
+
       REDIS_HOST: localhost
-      REDIS_PORT: 6379
-      REDIS_PASS: ''
-      DATABASE_URL: postgresql+asyncpg://auction_user:auction_pass_test@localhost:5432/auction
-      SECRET_KEY: test_secret_key
+      REDIS_PORT: ${{ vars.REDIS_PORT }}
+
+      DATABASE_URL: postgresql+asyncpg://${{ vars.DB_USER }}:${{ secrets.DB_PASS }}@localhost:${{ vars.DB_PORT }}/${{ vars.DB_NAME }}
+
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+
       PYTHONPATH: .
 
     steps:
@@ -47,10 +50,19 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ vars.PYTHON_VERSION }}
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for Postgres
+        run: |
+          until pg_isready -h localhost -p ${{ vars.DB_PORT }} -U ${{ vars.DB_USER }}; do
+            echo "Waiting for postgres..."
+            sleep 2
+          done
 
       - name: Run migrations
         run: alembic upgrade head
@@ -81,6 +93,6 @@ jobs:
       - uses: docker/build-push-action@v5
         with:
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/auction-engine:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/${{ vars.DOCKER_IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
