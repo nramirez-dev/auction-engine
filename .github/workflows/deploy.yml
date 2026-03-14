@@ -118,8 +118,9 @@ jobs:
             ghcr.io/nramirez-dev/auction-engine:${{ github.sha }}
 
       - name: Deploy to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          npm install -g @railway/cli
-          railway redeploy --service api --yes
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.RAILWAY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"query\":\"mutation { serviceInstanceRedeploy(environmentId: \\\"${{ vars.RAILWAY_ENVIRONMENT_ID }}\\\", serviceId: \\\"${{ vars.RAILWAY_SERVICE_ID }}\\\") }\"}" \
+            https://backboard.railway.com/graphql/v2
