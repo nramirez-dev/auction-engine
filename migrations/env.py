@@ -1,6 +1,7 @@
 import asyncio
 import os
 from logging.config import fileConfig
+from dotenv import load_dotenv
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -9,6 +10,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from src.infrastructure.db.models import Base, ProductModel, AuctionModel, BidModel  # noqa
+
+# Load environment variables from .env if present
+load_dotenv()
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -27,6 +31,8 @@ target_metadata = Base.metadata
 db_url = os.getenv("DATABASE_URL")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url)
+else:
+    raise ValueError("DATABASE_URL is not set in environment or .env file")
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

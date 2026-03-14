@@ -15,7 +15,6 @@ from src.application.products import (
     GetProductUseCase,
     DeleteProductUseCase,
 )
-from src.domain.exceptions import ProductNotFoundException, UnauthorizedProductAccessException
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -44,11 +43,11 @@ async def get_product(
     product_id: UUID,
     use_case: GetProductUseCase = Depends(get_get_product_use_case),
 ):
-    try:
-        product = await use_case.execute(product_id)
-        return product
-    except ProductNotFoundException as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    """
+    Retrieves a specific product by ID.
+    """
+    product = await use_case.execute(product_id)
+    return product
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_product(
@@ -56,9 +55,7 @@ async def delete_product(
     request: DeleteProductRequest,
     use_case: DeleteProductUseCase = Depends(get_delete_product_use_case),
 ):
-    try:
-        await use_case.execute(product_id=product_id, requester_id=request.requester_id)
-    except ProductNotFoundException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except UnauthorizedProductAccessException as e:
-        raise HTTPException(status_code=403, detail=str(e))
+    """
+    Deletes a product as long as the requester is authorized.
+    """
+    await use_case.execute(product_id=product_id, requester_id=request.requester_id)

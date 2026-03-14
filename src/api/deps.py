@@ -23,6 +23,7 @@ from src.application.products import (
     DeleteProductUseCase,
     ListProductsUseCase,
 )
+from src.application.auctions import CreateAuctionUseCase, GetAuctionUseCase
 
 def get_bid_repository(db: AsyncSession = Depends(get_db)) -> IBidRepository:
     return BidRepository(db)
@@ -66,3 +67,14 @@ def get_list_products_use_case(
     product_repo: IProductRepository = Depends(get_product_repository),
 ) -> ListProductsUseCase:
     return ListProductsUseCase(product_repo)
+
+def get_create_auction_use_case(
+    auction_repo: IAuctionRepository = Depends(get_auction_repository),
+    product_repo: IProductRepository = Depends(get_product_repository),
+) -> CreateAuctionUseCase:
+    return CreateAuctionUseCase(auction_repo, product_repo)
+
+def get_get_auction_use_case(
+    auction_repo: IAuctionRepository = Depends(get_auction_repository),
+) -> GetAuctionUseCase:
+    return GetAuctionUseCase(auction_repo)

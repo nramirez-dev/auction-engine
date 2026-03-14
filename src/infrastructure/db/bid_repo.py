@@ -26,7 +26,7 @@ class BidRepository(IBidRepository):
             idempotency_key=bid.idempotency_key
         )
         self.session.add(bid_model)
-        await self.session.flush()
+        await self.session.commit()
         return bid
 
     async def exists_by_idempotency_key(self, key: str) -> bool:
@@ -59,7 +59,7 @@ class ProductRepository(IProductRepository):
             description=product.description
         )
         self.session.add(product_model)
-        await self.session.flush()
+        await self.session.commit()
         return product
 
     async def get_by_id(self, id: uuid.UUID) -> Product:
@@ -75,7 +75,7 @@ class ProductRepository(IProductRepository):
         if not model:
             raise ProductNotFoundException(id)
         await self.session.delete(model)
-        await self.session.flush()
+        await self.session.commit()
 
     async def get_all(self) -> list[Product]:
         result = await self.session.execute(select(ProductModel))
@@ -109,7 +109,7 @@ class AuctionRepository(IAuctionRepository):
             closed_at=auction.closed_at
         )
         self.session.add(auction_model)
-        await self.session.flush()
+        await self.session.commit()
         return auction
 
     async def get_by_id(self, id: uuid.UUID) -> Auction:
@@ -133,5 +133,5 @@ class AuctionRepository(IAuctionRepository):
             raise AuctionNotFoundException(auction_id)
         model.current_price = new_price
         model.winner_id = winner_id
-        await self.session.flush()
+        await self.session.commit()
 
