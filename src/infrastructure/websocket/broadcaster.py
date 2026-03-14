@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 from uuid import UUID
 from redis import asyncio as aioredis
 
-from src.domain.entities import Bid
+from src.domain.bid import Bid
 from src.domain.interfaces import IBroadcastService
 
 
