@@ -51,27 +51,6 @@ docker compose up --build
 | --------------------------- | ---------------------- |
 | http://localhost/docs       | Swagger UI             |
 | http://localhost/dashboard/ | Live auction dashboard |
-| http://localhost/redoc      | ReDoc API docs         |
-
-## Local Scripts Setup (venv)
-
-The virtual environment is only needed to run local scripts — the full application runs entirely inside Docker.
-
-**Create and activate the venv inside the project root:**
-
-```bash
-# macOS / Linux
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Windows (PowerShell)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-> Once the venv is active, the commands in the sections below work as-is — no path prefix needed.
 
 ## API Endpoints
 
@@ -180,12 +159,12 @@ When `POST /api/v1/place-bid` is called, the system follows this sequence:
 
 **Failure scenarios:**
 
-| Failure                        | Outcome                                                                                                                                                                                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL write fails         | Exception raised before broadcast. No partial state. Lock released.                                                                                                                                                                       |
-| Redis lock unavailable         | Request rejected with `503` before touching the database. The client should retry — the condition is temporary (another bid is in-flight).                                                                                                |
+| Failure                        | Outcome                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PostgreSQL write fails         | Exception raised before broadcast. No partial state. Lock released.                                                                                                                                                                                                                                                                                                                                                                              |
+| Redis lock unavailable         | Request rejected with `503` before touching the database. The client should retry — the condition is temporary (another bid is in-flight).                                                                                                                                                                                                                                                                                                       |
 | Broadcast fails after DB write | **Broadcast is best-effort.** The bid is already committed to PostgreSQL (source of truth). The use case swallows the broadcast error, logs a warning, and still returns `201` to the client. Connected WebSocket clients will not receive the real-time push for that bid, but the state is fully consistent. Any client can verify the current price at any time via `GET /api/v1/auctions/{id}`. The idempotency key prevents unsafe retries. |
-| WebSocket client disconnects   | `WebSocketDisconnect` caught silently. Pub/Sub subscription cleaned up. No impact on bid flow.                                                                                                                                            |
+| WebSocket client disconnects   | `WebSocketDisconnect` caught silently. Pub/Sub subscription cleaned up. No impact on bid flow.                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Environment Management
 
@@ -230,6 +209,26 @@ Run against **100 concurrent users**, spawn rate 10, targeting `http://localhost
 | Concurrent lock     | 10 simultaneous bids at same amount | 1 accepted, 9 rejected | ✅ `{201: 1, 422: 9}`      |
 | Sequential overbids | 20 bids each +$1 higher             | All 20 accepted        | ✅ `{201: 20}`             |
 | Idempotency replay  | Same bid sent twice, same key       | 201 then 409           | ✅ `first=201, second=409` |
+
+## Local Scripts Setup (venv)
+
+The virtual environment is only needed to run local scripts — the full application runs entirely inside Docker.
+
+**Create and activate the venv inside the project root:**
+
+```bash
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Windows (PowerShell)
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+> Once the venv is active, the commands below work as-is — no path prefix needed.
 
 **Running the stress test** (with venv active):
 
