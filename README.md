@@ -36,23 +36,7 @@ No layer imports from a layer above it. The domain has zero external dependencie
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) — required for the full stack
-- [Python 3.12](https://python.org/downloads) — required only for running tests and scripts locally
-
-**Setting up the virtual environment** (needed to run stress tests and security scripts):
-
-```bash
-# Windows (PowerShell)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-
-# macOS / Linux
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-> The venv is only needed for local scripts. The full application runs entirely inside Docker.
+- [Python 3.12](https://python.org/downloads) — required only for running local scripts (stress tests, race condition PoC)
 
 ## Quick Start
 
@@ -60,7 +44,7 @@ pip install -r requirements.txt
 git clone https://github.com/nramirez-dev/auction-engine.git
 cd auction-engine
 cp .env.example .env
-docker-compose up --build
+docker compose up --build
 ```
 
 | URL                         | Description            |
@@ -68,6 +52,26 @@ docker-compose up --build
 | http://localhost/docs       | Swagger UI             |
 | http://localhost/dashboard/ | Live auction dashboard |
 | http://localhost/redoc      | ReDoc API docs         |
+
+## Local Scripts Setup (venv)
+
+The virtual environment is only needed to run local scripts — the full application runs entirely inside Docker.
+
+**Create and activate the venv inside the project root:**
+
+```bash
+# macOS / Linux
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Windows (PowerShell)
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+> Once the venv is active, the commands in the sections below work as-is — no path prefix needed.
 
 ## API Endpoints
 
@@ -230,11 +234,7 @@ Run against **100 concurrent users**, spawn rate 10, targeting `http://localhost
 **Running the stress test** (with venv active):
 
 ```bash
-# Windows
-.\.venv\Scripts\locust -f tests/stress/locustfile.py --host=http://localhost
-
-# macOS / Linux
-.venv/bin/locust -f tests/stress/locustfile.py --host=http://localhost
+locust -f tests/stress/locustfile.py --host=http://localhost
 ```
 
 Open http://localhost:8089 → Users: 100, Spawn rate: 10
@@ -244,10 +244,6 @@ Open http://localhost:8089 → Users: 100, Spawn rate: 10
 **Running the race condition script** (with venv active):
 
 ```bash
-# Windows
-.\.venv\Scripts\python tests/security/race_condition.py
-
-# macOS / Linux
 python tests/security/race_condition.py
 ```
 
@@ -265,9 +261,9 @@ See `.github/workflows/deploy.yml` for the full pipeline definition.
 ## Tool Recommendations
 
 | Tool                     | Purpose                                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- | --- |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
 | **SonarCloud**           | Static code analysis — detects bugs, code smells, and security hotspots on every push with quality gate enforcement       |
 | **GKE**                  | Managed Kubernetes engine — handles replica management, auto-scaling, and rolling deployments natively on Google Cloud    |
 | **Redis Sentinel**       | Redis high availability — eliminates the single point of failure in the state layer                                       |
 | **Prometheus + Grafana** | Metrics collection and real-time dashboards — monitors endpoint latency and bid processing performance across the cluster |
-| **Azure Key Vault**      | Production-grade secret management — native integration with Azure deployments, supports automatic secret rotation        |     |
+| **Azure Key Vault**      | Production-grade secret management — native integration with Azure deployments, supports automatic secret rotation        |

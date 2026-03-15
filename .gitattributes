@@ -1,0 +1,59 @@
+# .gitattributes
+# Enforce LF line endings for files executed or processed in Linux/Docker environments.
+# This prevents CRLF issues for developers cloning on Windows.
+
+# --- Default behaviour ---
+# Normalize all text files to LF in the repository (eol=lf).
+# Git will convert to the OS line ending on checkout only if text=auto is set without eol.
+* text=auto eol=lf
+
+# --- Shell scripts ---
+# Must always have LF; CRLF causes "bad interpreter" errors inside containers.
+*.sh text eol=lf
+
+# --- Python source files ---
+*.py text eol=lf
+
+# --- Docker ---
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+*.dockerfile text eol=lf
+docker-compose.yml text eol=lf
+docker-compose.*.yml text eol=lf
+
+# --- Config & env files ---
+*.env text eol=lf
+.env text eol=lf
+.env.* text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.toml text eol=lf
+
+# --- CI / GitHub Actions ---
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# --- Web / templating ---
+*.html text eol=lf
+*.json text eol=lf
+
+# --- Docs ---
+*.md text eol=lf
+*.txt text eol=lf
+
+# --- Alembic migrations ---
+*.py diff=python
+
+# --- Binary files (never touch line endings) ---
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.whl binary
+*.pyc binary
