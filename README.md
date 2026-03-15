@@ -47,10 +47,23 @@ cp .env.example .env
 docker compose up --build
 ```
 
-| URL                         | Description            |
-| --------------------------- | ---------------------- |
-| http://localhost/docs       | Swagger UI             |
-| http://localhost/dashboard/ | Live auction dashboard |
+| URL                              | Description            |
+| -------------------------------- | ---------------------- |
+| http://localhost:8080/docs       | Swagger UI             |
+| http://localhost:8080/dashboard/ | Live auction dashboard |
+
+> ⚠️ Ensure port **8080** is available before starting the stack.  
+> It is used by the Nginx reverse proxy as the single entry point to the system.
+
+## Horizontal Scaling
+
+The API layer supports horizontal scaling behind the Nginx reverse proxy.
+
+By default, running `docker compose up` starts a single FastAPI instance. For higher throughput and better simulation of a production environment, multiple API replicas can be launched using Docker Compose scaling:
+
+```bash
+docker compose up --scale api=3
+```
 
 ## API Endpoints
 
@@ -68,7 +81,7 @@ docker compose up --build
 
 ## Testing the Full Flow (Swagger UI)
 
-Open **http://localhost/docs** and follow these steps in order:
+Open **http://localhost:8080/docs** and follow these steps in order:
 
 ---
 
@@ -115,7 +128,7 @@ Open **http://localhost/docs** and follow these steps in order:
 Open [WebSocket King](https://websocketking.com) and connect to:
 
 ```
-ws://localhost/ws/auction/<auction_id>?ticket=<ticket from step 3>
+ws://localhost:8080/ws/auction/<auction_id>?ticket=<ticket from step 3>
 ```
 
 > Keep this tab open — you will see bids arrive in real time.
@@ -144,7 +157,7 @@ The response should show `"current_price": "1200.00"` and `"status": "ACTIVE"`.
 
 ---
 
-> Prefer a visual interface? Use the **Live Dashboard** at http://localhost/dashboard/ — it covers the full flow without touching Swagger.
+> Prefer a visual interface? Use the **Live Dashboard** at http://localhost:8080/dashboard/ — it covers the full flow without touching Swagger.
 
 ## Consistency Logic
 
@@ -189,18 +202,25 @@ cp .env.example .env
 
 ![Locust stress test — 100 concurrent users](docs/stress-test.png)
 
-Run against **100 concurrent users**, spawn rate 10, targeting `http://localhost`:
+Run against **100 concurrent users**, spawn rate **10**, targeting `http://localhost:8080`:
 
-| Endpoint                    | Requests  | Failures  | Median (ms) | 95th % (ms) | 99th % (ms) | Avg (ms) | RPS    |
-| --------------------------- | --------- | --------- | ----------- | ----------- | ----------- | -------- | ------ |
-| `GET /api/v1/auctions/{id}` | 1,668     | 0         | 700         | 1,500       | 2,100       | 705      | 9.5    |
-| `POST /api/v1/place-bid`    | 5,014     | 4,855\*   | 880         | 3,500       | 4,200       | 1,178    | 29.1   |
-| `GET /api/v1/products`      | 1,721     | 0         | 760         | 1,600       | 2,300       | 774      | 9.1    |
-| `POST /api/v1/products`     | 673       | 0         | 730         | 1,500       | 2,200       | 732      | 4.1    |
-| `GET /api/v1/products/{id}` | 655       | 0         | 750         | 1,700       | 2,100       | 779      | 4.2    |
-| **Aggregated**              | **9,731** | **4,855** | **800**     | **2,800**   | **3,900**   | **968**  | **56** |
+| Endpoint                            | Requests   | Failures  | Median (ms) | 95th % (ms) | 99th % (ms) | Avg (ms)  | RPS      |
+| ----------------------------------- | ---------- | --------- | ----------- | ----------- | ----------- | --------- | -------- |
+| `GET /api/v1/auctions/{auction_id}` | 3,134      | 0         | 78          | 380         | 600         | 123.9     | 13.3     |
+| `POST /api/v1/place-bid`            | 9,411      | 9,403\*   | 370         | 3,100       | 3,400       | 855.7     | 43.1     |
+| `GET /api/v1/products`              | 3,109      | 0         | 170         | 510         | 730         | 205.9     | 13.5     |
+| `POST /api/v1/products`             | 1,111      | 0         | 120         | 430         | 620         | 155.0     | 5.1      |
+| `GET /api/v1/products/{product_id}` | 1,050      | 0         | 95          | 410         | 640         | 135.5     | 5.7      |
+| **Aggregated**                      | **17,815** | **9,403** | **200**     | **3,000**   | **3,300**   | **527.4** | **80.7** |
 
-\*The 4,855 bid failures are **expected behavior** — concurrent users submitting bids below the current price are correctly rejected by the distributed lock. All non-bid endpoints show **0 failures**. This is the system working as designed, not a bug.
+\*_The 9,403 failures on `place-bid` are expected behavior under high concurrency._
+
+When multiple users attempt to place bids simultaneously, the system enforces
+consistency using distributed locking and bid validation. Bids that arrive
+after a higher bid has already been accepted are correctly rejected.
+
+All other endpoints show **0 failures**, indicating the API remains stable
+under load while protecting auction integrity.
 
 **Race condition test results** (`tests/security/race_condition.py`):
 
@@ -233,7 +253,7 @@ pip install -r requirements.txt
 **Running the stress test** (with venv active):
 
 ```bash
-locust -f tests/stress/locustfile.py --host=http://localhost
+locust -f tests/stress/locustfile.py --host=http://localhost:8080
 ```
 
 Open http://localhost:8089 → Users: 100, Spawn rate: 10
@@ -250,10 +270,28 @@ python tests/security/race_condition.py
 
 ## CI/CD Pipeline
 
-```
-Push to any branch  →  Run tests + migrations (PostgreSQL + Redis services)
-Push to main        →  Tests pass → Build Docker image → Push to Docker Hub
-```
+The project includes a full CI/CD pipeline powered by GitHub Actions.
+
+**CI workflow**
+
+On every push and pull request:
+
+1. Start PostgreSQL and Redis containers
+2. Build the API container
+3. Run database migrations
+4. Execute the full test suite with `pytest`
+
+This ensures the application always builds and passes tests before deployment.
+
+**Deployment workflow**
+
+When changes are pushed to the `main` branch:
+
+1. Build the Docker image
+2. Push the image to **GitHub Container Registry (GHCR)**
+3. Trigger a redeploy on **Railway** via the Railway GraphQL API
+
+This guarantees that every deployed version originates from a tested container image.
 
 See `.github/workflows/deploy.yml` for the full pipeline definition.
 

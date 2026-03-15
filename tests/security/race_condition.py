@@ -26,7 +26,7 @@ from decimal import Decimal
 
 import httpx
 
-BASE_URL = "http://localhost"
+BASE_URL = "http://localhost:8080"
 HEADERS = {"Content-Type": "application/json"}
 
 
