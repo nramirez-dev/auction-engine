@@ -57,15 +57,26 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
 
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - ./frontend/dist:/usr/share/nginx/html/dashboard
+    command: sh -c "npm install && npm run build"
+    networks:
+      - auction-network
+
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html/dashboard:ro
     depends_on:
-      api:
-        condition: service_started
+      - api
+      - frontend
     networks:
       - auction-network
     restart: unless-stopped
