@@ -1,7 +1,10 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from src.domain.auction import AuctionStatus
 from src.domain.bid import Bid
@@ -55,8 +58,14 @@ class PlaceBidUseCase:
             
             saved_bid = await self._bid_repo.save(bid)
             await self._auction_repo.update_price(auction_id, amount, user_id)
-            
-            await self._broadcast_service.publish(auction_id, saved_bid)
-            
+
+            try:
+                await self._broadcast_service.publish(auction_id, saved_bid)
+            except Exception as exc:
+                logger.warning(
+                    "Broadcast failed for auction %s bid %s — clients will not receive real-time update: %s",
+                    auction_id, saved_bid.id, exc
+                )
+
             return saved_bid
 

@@ -12,7 +12,8 @@ from src.domain.exceptions import (
     AuctionNotFoundException,
     ProductNotFoundException,
     DuplicateBidException,
-    UnauthorizedProductAccessException
+    UnauthorizedProductAccessException,
+    LockNotAcquiredException
 )
 
 @asynccontextmanager
@@ -78,6 +79,13 @@ async def duplicate_bid_handler(request: Request, exc: DuplicateBidException):
     return JSONResponse(
         status_code=409,
         content={"error": "This bid was already processed"}
+    )
+
+@app.exception_handler(LockNotAcquiredException)
+async def lock_not_acquired_handler(request: Request, exc: LockNotAcquiredException):
+    return JSONResponse(
+        status_code=503,
+        content={"error": "The auction is busy processing another bid. Please retry in a moment."}
     )
 
 @app.exception_handler(UnauthorizedProductAccessException)

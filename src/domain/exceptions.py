@@ -38,3 +38,8 @@ class UnauthorizedProductAccessException(AuctionEngineException):
         self.product_id = product_id
         super().__init__(f"User {user_id} is not authorized to modify or delete product {product_id}.")
 
+class LockNotAcquiredException(AuctionEngineException):
+    def __init__(self, auction_id: UUID):
+        self.auction_id = auction_id
+        super().__init__(f"Could not acquire lock for auction {auction_id}. Another bid is being processed — please retry.")
+

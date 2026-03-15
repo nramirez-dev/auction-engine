@@ -180,12 +180,12 @@ When `POST /api/v1/place-bid` is called, the system follows this sequence:
 
 **Failure scenarios:**
 
-| Failure                        | Outcome                                                                                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL write fails         | Exception raised before broadcast. No partial state. Lock released.                                                                       |
-| Redis lock unavailable         | Request rejected with `409` before touching the database.                                                                                 |
-| Broadcast fails after DB write | Bid is saved in DB. Client receives `500`. Safe to re-fetch via `GET /api/v1/auctions/{id}`. The idempotency key prevents unsafe retries. |
-| WebSocket client disconnects   | `WebSocketDisconnect` caught silently. Pub/Sub subscription cleaned up. No impact on bid flow.                                            |
+| Failure                        | Outcome                                                                                                                                                                                                                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL write fails         | Exception raised before broadcast. No partial state. Lock released.                                                                                                                                                                       |
+| Redis lock unavailable         | Request rejected with `503` before touching the database. The client should retry — the condition is temporary (another bid is in-flight).                                                                                                |
+| Broadcast fails after DB write | **Broadcast is best-effort.** The bid is already committed to PostgreSQL (source of truth). The use case swallows the broadcast error, logs a warning, and still returns `201` to the client. Connected WebSocket clients will not receive the real-time push for that bid, but the state is fully consistent. Any client can verify the current price at any time via `GET /api/v1/auctions/{id}`. The idempotency key prevents unsafe retries. |
+| WebSocket client disconnects   | `WebSocketDisconnect` caught silently. Pub/Sub subscription cleaned up. No impact on bid flow.                                                                                                                                            |
 
 ## Environment Management
 

@@ -5,7 +5,7 @@ from redis import asyncio as aioredis
 from redis.exceptions import LockError
 
 from src.domain.interfaces import ILockService
-from src.domain.exceptions import AuctionNotActiveException
+from src.domain.exceptions import LockNotAcquiredException
 
 
 class LockService(ILockService):
@@ -32,7 +32,7 @@ class LockService(ILockService):
         
         acquired = await lock.acquire()
         if not acquired:
-            raise AuctionNotActiveException(auction_uuid, "LOCKED")
+            raise LockNotAcquiredException(auction_uuid)
             
         try:
             yield
